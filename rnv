@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+# RNV: Ruby Nano Vim Text Editor
+require_relative 'core'
+require_relative 'ui'
+
+def print_help
+  puts "Использование: rnv [флаги] [имя_файла]"
+  puts "Флаги:"
+  puts "  -h, --help     Показать эту справку"
+  puts "  -v, --version  Показать версию редактора"
+  exit
+end
+
+print_help if ARGV.include?('-h') || ARGV.include?('--help')
+
+if ARGV.include?('-v') || ARGV.include?('--version')
+  puts "RNV (Ruby Nano Vim) Editor v1.0.0"
+  exit
+end
+
+filename = ARGV.reject { |arg| arg.start_with?('-') }.first
+UI.start(filename)
