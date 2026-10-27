@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
-# RNV: Ruby Nano Variant (Pure Nano Style Monolith)
+# RNV: Ruby Nano Variant (Pure Nano Style with Auto-Backup Engine)
 require 'io/console'
 
 def print_help
-  puts "RNV (Ruby Nano Variant) — Текстовый редактор в стиле Nano"
+  puts "RNV (Ruby Nano Variant) -- Текстовый редактор в стиле Nano с авто-бэкапом"
   puts "\nИспользование:\n  rnv [флаги] [имя_файла]"
   puts "\nФлаги:\n  -h, --help     Показать справку\n  -v, --version  Показать версию"
   puts "\nУправление:\n  Просто пишите текст. Сочетания клавиш как в Nano."
@@ -14,17 +14,35 @@ end
 
 if ARGV.include?('-h') || ARGV.include?('--help') then print_help end
 if ARGV.include?('-v') || ARGV.include?('--version')
-  puts "RNV Editor v1.3.0-ruby-monolith"
+  puts "RNV Editor v1.5.0-stable"
   exit
 end
 
 class RnvEngine
   def initialize(filename)
     @filename = filename
-    @lines = (filename && File.exist?(filename)) ? File.readlines(filename).map(&:chomp) : [""]
-    @lines = [""] if @lines.empty?
+    @backup_name = @filename ? ".#{@filename}.bak" : nil
+    @lines = [""]
     @cx = 0; @cy = 0
-    @prompt_mode = false; @prompt_input = @filename || ""
+    @prompt_mode = :none
+    @prompt_input = ""
+    
+    check_and_load_file
+  end
+
+  def check_and_load_file
+    if @filename
+      if @backup_name && File.exist?(@backup_name)
+        @prompt_mode = :backup_restore
+        @prompt_input = ""
+        @backup_lines = File.readlines(@backup_name).map(&:chomp)
+      end
+
+      if @prompt_mode == :none && File.exist?(@filename)
+        @lines = File.readlines(@filename).map(&:chomp)
+      end
+    end
+    @lines = [""] if @lines.empty?
   end
 
   def run
@@ -38,14 +56,19 @@ class RnvEngine
       end
     end
   ensure
+    File.delete(@backup_name) if @backup_name && File.exist?(@backup_name) && @prompt_mode == :none
     print "\e[?25h\e[0m\e[2J\e[H"
+  end
+
+  def trigger_backup
+    return unless @filename
+    File.open(@backup_name, 'w') { |f| f.puts @lines.join("\n") }
   end
 
   def render
     rows, cols = IO.console.winsize
     buffer = "\e[?25l\e[H"
 
-    # Текст
     (0...rows - 3).each do |i|
       if i < @lines.size
         buffer << (@lines[i][0...cols] || "") << "\e[K\n"
@@ -54,21 +77,23 @@ class RnvEngine
       end
     end
 
-    # Розовый статус-бар
     buffer << "\e[#{rows - 2};1H\e[48;5;198m\e[38;5;232m\e[1m"
-    status = " RNV v1.3.0 (Ruby) | Файл: #{@filename || 'Новый файл'}"
+    status = " RNV v1.5.0 (Ruby) | Файл: #{@filename || 'Новый файл'}"
     buffer << status.ljust(cols) << "\e[0m\n"
 
-    # Нижняя строка (Подсказки или Запрос сохранения)
-    if @prompt_mode
+    case @prompt_mode
+    when :save
       buffer << "\e[48;5;255m\e[38;5;16m Имя файла для записи: #{@prompt_input}".ljust(cols) << "\e[0m"
+    when :backup_restore
+      buffer << "\e[48;5;160m\e[38;5;255m\e[1m Найдена аварийная копия! Восстановить? (y/n): #{@prompt_input}".ljust(cols) << "\e[0m"
     else
       buffer << "\e[48;5;198m\e[38;5;232m\e[1m  ^O Сохранить    ^X Выход".ljust(cols) << "\e[0m"
     end
 
-    # Курсор
-    if @prompt_mode
+    if @prompt_mode == :save
       buffer << "\e[#{rows};#{@prompt_input.length + 24}H"
+    elsif @prompt_mode == :backup_restore
+      buffer << "\e[#{rows};#{@prompt_input.length + 46}H"
     else
       buffer << "\e[#{@cy + 1};#{@cx + 1}H"
     end
@@ -77,55 +102,77 @@ class RnvEngine
 
   def handle_input
     char = $stdin.getc
-    if @prompt_mode
+    
+    if @prompt_mode == :backup_restore
+      case char.downcase
+      when 'y'
+        @lines = @backup_lines
+        @prompt_mode = :none
+        @cx = 0; @cy = 0
+      when 'n', "\e"
+        if File.exist?(@filename)
+          @lines = File.readlines(@filename).map(&:chomp)
+        end
+        File.delete(@backup_name) if File.exist?(@backup_name)
+        @prompt_mode = :none
+      end
+      return
+    end
+
+    if @prompt_mode == :save
       case char.ord
-      when 13, 10 # Enter
+      when 13, 10
         if !@prompt_input.strip.empty?
           @filename = @prompt_input
+          @backup_name = ".#{@filename}.bak"
           File.open(@filename, 'w') { |f| f.puts @lines.join("\n") }
         end
-        @prompt_mode = false
-      when 27 # ESC
-        @prompt_mode = false
-      when 127, 8 # Backspace
+        @prompt_mode = :none
+      when 27
+        @prompt_mode = :none
+      when 127, 8
         @prompt_input.slice!(-1) if @prompt_input.length > 0
       else
         @prompt_input << char if char.match?(/[[:print:]]/)
       end
+      return
+    end
+
+    case char
+    when "\u0018" then exit
+    when "\u000F"
+      @prompt_mode = :save
+      @prompt_input = @filename || ""
     else
-      case char
-      when "\u0018" then exit # Ctrl+X
-      when "\u000F" # Ctrl+O
-        @prompt_mode = true
-        @prompt_input = @filename || ""
+      case char.ord
+      when 127, 8
+        if @cx > 0
+          @lines[@cy].slice!(@cx - 1); @cx -= 1
+        elsif @cy > 0
+          @cx = @lines[@cy - 1].length
+          @lines[@cy - 1] += @lines.delete_at(@cy); @cy -= 1
+        end
+        trigger_backup
+      when 13, 10
+        remainder = @lines[@cy].slice!(@cx..-1) || ""
+        @lines.insert(@cy + 1, remainder)
+        @cy += 1; @cx = 0
+        trigger_backup
+      when 27
+        next_char = $stdin.getc
+        if next_char == "["
+          case $stdin.getc
+          when "A" then @cy = [0, @cy - 1].max; @cx = [@cx, @lines[@cy].length].min
+          when "B" then @cy = [@lines.size - 1, @cy + 1].min; @cx = [@cx, @lines[@cy].length].min
+          when "C" then @cx = [@lines[@cy].length, @cx + 1].min
+          when "D" then @cx = [0, @cx - 1].max
+          end
+        end
       else
-        case char.ord
-        when 127, 8 # Backspace
-          if @cx > 0
-            @lines[@cy].slice!(@cx - 1); @cx -= 1
-          elsif @cy > 0
-            @cx = @lines[@cy - 1].length
-            @lines[@cy - 1] += @lines.delete_at(@cy); @cy -= 1
-          end
-        when 13, 10 # Enter
-          remainder = @lines[@cy].slice!(@cx..-1) || ""
-          @lines.insert(@cy + 1, remainder)
-          @cy += 1; @cx = 0
-        when 27 # Стрелочки навигации
-          next_char = $stdin.getc
-          if next_char == "["
-            case $stdin.getc
-            when "A" then @cy = [0, @cy - 1].max; @cx = [@cx, @lines[@cy].length].min # Вверх
-            when "B" then @cy = [@lines.size - 1, @cy + 1].min; @cx = [@cx, @lines[@cy].length].min # Вниз
-            when "C" then @cx = [@lines[@cy].length, @cx + 1].min # Вправо
-            when "D" then @cx = [0, @cx - 1].max # Влево
-            end
-          end
-        else
-          if char.match?(/[[:print:]]/)
-            @lines[@cy].insert(@cx, char)
-            @cx += 1
-          end
+        if char.match?(/[[:print:]]/)
+          @lines[@cy].insert(@cx, char)
+          @cx += 1
+          trigger_backup
         end
       end
     end
