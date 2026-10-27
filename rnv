@@ -4,17 +4,27 @@ require_relative 'core'
 require_relative 'ui'
 
 def print_help
-  puts "Использование: rnv [флаги] [имя_файла]"
-  puts "Флаги:"
+  puts "RNV (Ruby Nano Vim) — Минималистичный модальный текстовый редактор"
+  puts "\nИспользование:"
+  puts "  rnv [флаги] [имя_файла]"
+  puts "\nФлаги:"
   puts "  -h, --help     Показать эту справку"
   puts "  -v, --version  Показать версию редактора"
+  puts "\nУправление (в COMMAND режиме):"
+  puts "  i              Перейти в режим редактирования (INSERT)"
+  puts "  ESC            Вернуться в режим команд (COMMAND)"
+  puts "  h, j, k, l     Движение курсора (Влево, Вниз, Вверх, Вправо)"
+  puts "  Ctrl + O       Сохранить файл"
+  puts "  Ctrl + X       Выйти из редактора"
   exit
 end
 
-print_help if ARGV.include?('-h') || ARGV.include?('--help')
+if ARGV.include?('-h') || ARGV.include?('--help')
+  print_help
+end
 
 if ARGV.include?('-v') || ARGV.include?('--version')
-  puts "RNV (Ruby Nano Vim) Editor v1.0.0"
+  puts "RNV (Ruby Nano Vim) v1.1.0-stable"
   exit
 end
 
