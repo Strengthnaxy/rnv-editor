@@ -15,8 +15,10 @@ pub fn render(core: &RnvCore) -> Result<(), std::io::Error> {
     stdout.queue(terminal::Clear(terminal::ClearType::All))?;
     stdout.queue(cursor::MoveTo(0, 0))?;
 
-    // Отрисовка основного текста
-    for i in 0..(rows - 3) {
+    // Подсчет доступных строк под текст в зависимости от показа панели подсказок
+    let bottom_reserved = if core.show_help_bar || core.prompt_mode { 3 } else { 2 };
+
+    for i in 0..(rows - bottom_reserved) {
         if i < core.lines.len() {
             let line = &core.lines[i];
             let display_line = if line.len() > cols { &line[0..cols] } else { line };
@@ -27,32 +29,33 @@ pub fn render(core: &RnvCore) -> Result<(), std::io::Error> {
         stdout.write_all(b"\r\n")?;
     }
 
-    // Розовый статус-бар
-    stdout.queue(cursor::MoveTo(0, (rows - 3) as u16))?;
+    // Динамический цвет статус-бара из конфига rnv.exs
+    stdout.queue(cursor::MoveTo(0, (rows - bottom_reserved) as u16))?;
     let file_title = core.filename.clone().unwrap_or_else(|| String::from("Новый файл"));
-    let status_bar_text = format!(" RNV v1.2.0-Rust | Файл: {}", file_title);
+    let status_bar_text = format!(" RNV v1.3.0-Exs | Файл: {}", file_title);
     let padded_status = format!("{:<width$}", status_bar_text, width = cols);
     print!(
         "{}",
         padded_status
             .with(Color::AnsiValue(232))
-            .on(Color::AnsiValue(198))
+            .on(Color::AnsiValue(core.status_color))
             .bold()
     );
 
-    // Блок подсказок / Интерактивный Промпт
-    stdout.queue(cursor::MoveTo(0, (rows - 2) as u16))?;
+    // Отрисовка интерактивной строки ввода или панели подсказок
     if core.prompt_mode {
+        stdout.queue(cursor::MoveTo(0, (rows - 2) as u16))?;
         let prompt = format!("{} {}", core.prompt_message, core.prompt_input);
         let padded_prompt = format!("{:<width$}", prompt, width = cols);
         print!("{}", padded_prompt.with(Color::Black).on(Color::White));
-    } else {
+    } else if core.show_help_bar {
+        stdout.queue(cursor::MoveTo(0, (rows - 2) as u16))?;
         let help_text = " ^O Сохранить    ^X Выход";
         let padded_help = format!("{:<width$}", help_text, width = cols);
-        print!("{}", padded_help.with(Color::AnsiValue(198)).bold());
+        print!("{}", padded_help.with(Color::AnsiValue(core.status_color)).bold());
     }
 
-    // Позиционирование курсора
+    // Фокусировка курсора
     if core.prompt_mode {
         let start_x = core.prompt_message.len() + 1 + core.cursor_x;
         stdout.queue(cursor::MoveTo(start_x as u16, (rows - 2) as u16))?;
