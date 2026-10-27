@@ -6,7 +6,7 @@ The repository also includes utility addons for text statistics and background d
 
 ## Project Structure
 
-rnv-editor/
+'''rnv-editor/
 ├── rnv            # Monolithic Ruby implementation (No external dependencies)
 ├── analyzer.rb    # Ruby text statistic and metrics analyzer script
 ├── cleaner.exs    # Elixir background backup and log cleaner tool
@@ -14,7 +14,7 @@ rnv-editor/
 └── src/           # High-performance Compiled Rust codebase
     ├── main.rs    # Event capture loops and CLI arguments
     ├── core.rs    # Memory grid buffer modifiers
-    └── ui.rs      # Optimized double-buffered pink screen flushers
+'''    └── ui.rs      # Optimized double-buffered pink screen flushers
 
 ## Unified Controls
 
