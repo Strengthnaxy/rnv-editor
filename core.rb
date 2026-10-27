@@ -23,6 +23,7 @@ class RnvCore
   end
 
   def insert_char(char)
+    @lines[@cursor_y] = "" if @lines[@cursor_y].nil?
     @lines[@cursor_y].insert(@cursor_x, char)
     @cursor_x += 1
   end
