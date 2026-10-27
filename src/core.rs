@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{Write, BufReader, BufRead};
 use std::path::Path;
+use std::process::Command;
 
 pub struct RnvCore {
     pub lines: Vec<String>,
@@ -10,6 +11,9 @@ pub struct RnvCore {
     pub prompt_mode: bool,
     pub prompt_message: String,
     pub prompt_input: String,
+    // Поля конфигурации
+    pub status_color: u8,
+    pub show_help_bar: bool,
 }
 
 impl RnvCore {
@@ -30,6 +34,32 @@ impl RnvCore {
         if lines.is_empty() {
             lines.push(String::new());
         }
+
+        // Значения по умолчанию
+        let mut status_color = 198;
+        let mut show_help_bar = true;
+
+        // Парсинг конфига Elixir (~/.config/rnv/rnv.exs)
+        if let Some(home) = std::env::var_os("HOME") {
+            let config_path = Path::new(&home).join(".config/rnv/rnv.exs");
+            if config_path.exists() {
+                if let Ok(output) = Command::new("elixir").arg(config_path).output() {
+                    if output.status.success() {
+                        let stdout_str = String::from_utf8_lossy(&output.stdout);
+                        let parts: Vec<&str> = stdout_str.trim().split(',').collect();
+                        if parts.len() == 2 {
+                            if let Ok(color) = parts[0].parse::<u8>() {
+                                status_color = color;
+                            }
+                            if let Ok(show) = parts[1].parse::<bool>() {
+                                show_help_bar = show;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Self {
             lines,
             cursor_x: 0,
@@ -38,6 +68,8 @@ impl RnvCore {
             prompt_mode: false,
             prompt_message: String::new(),
             prompt_input: String::new(),
+            status_color,
+            show_help_bar,
         }
     }
 
