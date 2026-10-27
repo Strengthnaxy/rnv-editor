@@ -1,32 +1,136 @@
 #!/usr/bin/env ruby
-# RNV: Ruby Nano Vim Text Editor
-require_relative 'core'
-require_relative 'ui'
+# RNV: Ruby Nano Variant (Pure Nano Style Monolith)
+require 'io/console'
 
 def print_help
-  puts "RNV (Ruby Nano Vim) — Минималистичный модальный текстовый редактор"
-  puts "\nИспользование:"
-  puts "  rnv [флаги] [имя_файла]"
-  puts "\nФлаги:"
-  puts "  -h, --help     Показать эту справку"
-  puts "  -v, --version  Показать версию редактора"
-  puts "\nУправление (в COMMAND режиме):"
-  puts "  i              Перейти в режим редактирования (INSERT)"
-  puts "  ESC            Вернуться в режим команд (COMMAND)"
-  puts "  h, j, k, l     Движение курсора (Влево, Вниз, Вверх, Вправо)"
-  puts "  Ctrl + O       Сохранить файл"
+  puts "RNV (Ruby Nano Variant) — Текстовый редактор в стиле Nano"
+  puts "\nИспользование:\n  rnv [флаги] [имя_файла]"
+  puts "\nФлаги:\n  -h, --help     Показать справку\n  -v, --version  Показать версию"
+  puts "\nУправление:\n  Просто пишите текст. Сочетания клавиш как в Nano."
+  puts "  Ctrl + O       Сохранить файл (с интерактивным запросом)"
   puts "  Ctrl + X       Выйти из редактора"
   exit
 end
 
-if ARGV.include?('-h') || ARGV.include?('--help')
-  print_help
-end
-
+if ARGV.include?('-h') || ARGV.include?('--help') then print_help end
 if ARGV.include?('-v') || ARGV.include?('--version')
-  puts "RNV (Ruby Nano Vim) v1.1.0-stable"
+  puts "RNV Editor v1.3.0-ruby-monolith"
   exit
 end
 
+class RnvEngine
+  def initialize(filename)
+    @filename = filename
+    @lines = (filename && File.exist?(filename)) ? File.readlines(filename).map(&:chomp) : [""]
+    @lines = [""] if @lines.empty?
+    @cx = 0; @cy = 0
+    @prompt_mode = false; @prompt_input = @filename || ""
+  end
+
+  def run
+    $stdout.sync = true
+    $stdin.noecho do
+      $stdin.raw do
+        loop do
+          render
+          handle_input
+        end
+      end
+    end
+  ensure
+    print "\e[?25h\e[0m\e[2J\e[H"
+  end
+
+  def render
+    rows, cols = IO.console.winsize
+    buffer = "\e[?25l\e[H"
+
+    # Текст
+    (0...rows - 3).each do |i|
+      if i < @lines.size
+        buffer << (@lines[i][0...cols] || "") << "\e[K\n"
+      else
+        buffer << "~\e[K\n"
+      end
+    end
+
+    # Розовый статус-бар
+    buffer << "\e[#{rows - 2};1H\e[48;5;198m\e[38;5;232m\e[1m"
+    status = " RNV v1.3.0 (Ruby) | Файл: #{@filename || 'Новый файл'}"
+    buffer << status.ljust(cols) << "\e[0m\n"
+
+    # Нижняя строка (Подсказки или Запрос сохранения)
+    if @prompt_mode
+      buffer << "\e[48;5;255m\e[38;5;16m Имя файла для записи: #{@prompt_input}".ljust(cols) << "\e[0m"
+    else
+      buffer << "\e[48;5;198m\e[38;5;232m\e[1m  ^O Сохранить    ^X Выход".ljust(cols) << "\e[0m"
+    end
+
+    # Курсор
+    if @prompt_mode
+      buffer << "\e[#{rows};#{@prompt_input.length + 24}H"
+    else
+      buffer << "\e[#{@cy + 1};#{@cx + 1}H"
+    end
+    print buffer << "\e[?25h"
+  end
+
+  def handle_input
+    char = $stdin.getc
+    if @prompt_mode
+      case char.ord
+      when 13, 10 # Enter
+        if !@prompt_input.strip.empty?
+          @filename = @prompt_input
+          File.open(@filename, 'w') { |f| f.puts @lines.join("\n") }
+        end
+        @prompt_mode = false
+      when 27 # ESC
+        @prompt_mode = false
+      when 127, 8 # Backspace
+        @prompt_input.slice!(-1) if @prompt_input.length > 0
+      else
+        @prompt_input << char if char.match?(/[[:print:]]/)
+      end
+    else
+      case char
+      when "\u0018" then exit # Ctrl+X
+      when "\u000F" # Ctrl+O
+        @prompt_mode = true
+        @prompt_input = @filename || ""
+      else
+        case char.ord
+        when 127, 8 # Backspace
+          if @cx > 0
+            @lines[@cy].slice!(@cx - 1); @cx -= 1
+          elsif @cy > 0
+            @cx = @lines[@cy - 1].length
+            @lines[@cy - 1] += @lines.delete_at(@cy); @cy -= 1
+          end
+        when 13, 10 # Enter
+          remainder = @lines[@cy].slice!(@cx..-1) || ""
+          @lines.insert(@cy + 1, remainder)
+          @cy += 1; @cx = 0
+        when 27 # Стрелочки навигации
+          next_char = $stdin.getc
+          if next_char == "["
+            case $stdin.getc
+            when "A" then @cy = [0, @cy - 1].max; @cx = [@cx, @lines[@cy].length].min # Вверх
+            when "B" then @cy = [@lines.size - 1, @cy + 1].min; @cx = [@cx, @lines[@cy].length].min # Вниз
+            when "C" then @cx = [@lines[@cy].length, @cx + 1].min # Вправо
+            when "D" then @cx = [0, @cx - 1].max # Влево
+            end
+          end
+        else
+          if char.match?(/[[:print:]]/)
+            @lines[@cy].insert(@cx, char)
+            @cx += 1
+          end
+        end
+      end
+    end
+  end
+end
+
 filename = ARGV.reject { |arg| arg.start_with?('-') }.first
-UI.start(filename)
+RnvEngine.new(filename).run
