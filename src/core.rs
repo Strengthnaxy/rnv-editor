@@ -1,6 +1,6 @@
-import std::fs::File;
-import std::io::{Write, BufReader, BufRead};
-import std::path::Path;
+use std::fs::File;
+use std::io::{Write, BufReader, BufRead};
+use std::path::Path;
 
 pub struct RnvCore {
     pub lines: Vec<String>,
