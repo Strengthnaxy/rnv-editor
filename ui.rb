@@ -12,22 +12,33 @@ module UI
       end
     end
   ensure
+    # Полный сброс стилей терминала при выходе
     print "\e[?25h\e[0m\e[2J\e[H"
   end
 
   def self.render(core)
-    print "\e[2J\e[H\e[?25l"
-    
-    core.lines.each do |line|
-      puts line
+    rows, cols = IO.console.winsize
+    buffer = "\e[?25l\e[H" # Прячем курсор, прыгаем в начало
+
+    # Отрисовка текстового буфера
+    (0...rows - 2).each do |i|
+      if i < core.lines.size
+        line = core.lines[i][0...cols] || ""
+        buffer << line << "\e[K\n"
+      else
+        buffer << "~\e[K\n"
+      end
     end
 
-    # Статус-бар в розовом цвете Gentoo/Magenta
-    print "\e[H\e[#{IO.console.winsize - 1}H"
+    # Плавное вычисление статус-бара в самом низу
+    buffer << "\e[#{rows - 1};1H"
     mode_str = core.mode == :insert ? " -- INSERT -- " : " -- COMMAND -- "
-    print "\e[48;5;198m\e[38;5;232m\e[1m RNV \e[0m\e[7m#{mode_str}| Файл: #{core.filename || 'Новый'} \e[0m"
+    status_text = " RNV #{mode_str}| Файл: #{core.filename || 'Новый'}"
+    buffer << "\e[48;5;198m\e[38;5;232m\e[1m" << status_text.ljust(cols) << "\e[0m"
 
-    print "\e[#{core.cursor_y + 1};#{core.cursor_x + 1}H\e[?25h"
+    # Возврат курсора на рабочую позицию
+    buffer << "\e[#{core.cursor_y + 1};#{core.cursor_x + 1}H\e[?25h"
+    print buffer
   end
 
   def self.handle_input(core)
@@ -36,10 +47,9 @@ module UI
     when "\e"
       core.mode = :command
     when "\u0018" # Ctrl+X
-      print "\e[2J\e[H"
       exit
     when "\u000F" # Ctrl+O
-      core.save_file if core.mode == :command
+      core.save_file
     else
       if core.mode == :command
         case char
