@@ -1,10 +1,10 @@
-import crate::core::RnvCore;
-import crossterm::{
+use crate::core::RnvCore;
+use crossterm::{
     cursor,
-    style::{self, Color, Stylize},
+    style::{Color, Stylize},
     terminal, QueueableCommand,
 };
-import std::io::{stdout, Write};
+use std::io::{stdout, Write};
 
 pub fn render(core: &RnvCore) -> Result<(), std::io::Error> {
     let mut stdout = stdout();
@@ -15,7 +15,7 @@ pub fn render(core: &RnvCore) -> Result<(), std::io::Error> {
     stdout.queue(terminal::Clear(terminal::ClearType::All))?;
     stdout.queue(cursor::MoveTo(0, 0))?;
 
-    // 1. Отрисовка основного текста
+    // Отрисовка основного текста
     for i in 0..(rows - 3) {
         if i < core.lines.len() {
             let line = &core.lines[i];
@@ -27,7 +27,7 @@ pub fn render(core: &RnvCore) -> Result<(), std::io::Error> {
         stdout.write_all(b"\r\n")?;
     }
 
-    // 2. Розовый статус-бар Nano
+    // Розовый статус-бар
     stdout.queue(cursor::MoveTo(0, (rows - 3) as u16))?;
     let file_title = core.filename.clone().unwrap_or_else(|| String::from("Новый файл"));
     let status_bar_text = format!(" RNV v1.2.0-Rust | Файл: {}", file_title);
@@ -40,7 +40,7 @@ pub fn render(core: &RnvCore) -> Result<(), std::io::Error> {
             .bold()
     );
 
-    // 3. Блок подсказок / Интерактивный Промпт
+    // Блок подсказок / Интерактивный Промпт
     stdout.queue(cursor::MoveTo(0, (rows - 2) as u16))?;
     if core.prompt_mode {
         let prompt = format!("{} {}", core.prompt_message, core.prompt_input);
@@ -52,7 +52,7 @@ pub fn render(core: &RnvCore) -> Result<(), std::io::Error> {
         print!("{}", padded_help.with(Color::AnsiValue(198)).bold());
     }
 
-    // 4. Позиционирование курсора
+    // Позиционирование курсора
     if core.prompt_mode {
         let start_x = core.prompt_message.len() + 1 + core.cursor_x;
         stdout.queue(cursor::MoveTo(start_x as u16, (rows - 2) as u16))?;
