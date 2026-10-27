@@ -1,10 +1,10 @@
 mod core;
 mod ui;
 
-import core::RnvCore;
-import crossterm::event::{self, Event, KeyCode, KeyModifiers};
-import crossterm::terminal;
-import std::env;
+use core::RnvCore;
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::terminal;
+use std::env;
 
 fn print_help() {
     println!("RNV (Ruby Nano Vim) -> Теперь на чистом Rust!");
@@ -37,7 +37,6 @@ fn main() -> Result<(), std::io::Error> {
 
         if let Event::Key(key_event) = event::read()? {
             if core.prompt_mode {
-                // Обработка ввода внутри диалога сохранения (Prompt)
                 match key_event.code {
                     KeyCode::Enter => {
                         if !core.prompt_input.trim().is_empty() {
@@ -46,7 +45,6 @@ fn main() -> Result<(), std::io::Error> {
                         }
                         core.prompt_mode = false;
                         core.prompt_input.clear();
-                        // Возвращаем курсор обратно на текст файла
                         core.cursor_y = 0;
                         core.cursor_x = core.lines[0].len();
                     }
@@ -55,15 +53,14 @@ fn main() -> Result<(), std::io::Error> {
                         core.prompt_input.clear();
                     }
                     KeyCode::Char(c) => core.insert_char(c),
-                    KeyCode::Backspace => core.delete_char,
+                    KeyCode::Backspace => core.delete_char(),
                     _ => {}
                 }
             } else {
-                // Основной режим редактирования (Прямой ввод текста как в Nano)
                 if key_event.modifiers.contains(KeyModifiers::CONTROL) {
                     match key_event.code {
-                        KeyCode::Char('x') => break, // Ctrl+X -> Выход
-                        KeyCode::Char('o') => {     // Ctrl+O -> Сохранить с вопросом
+                        KeyCode::Char('x') => break,
+                        KeyCode::Char('o') => {
                             core.prompt_mode = true;
                             core.prompt_message = String::from("Имя файла для записи?");
                             core.prompt_input = core.filename.clone().unwrap_or_default();
@@ -74,7 +71,7 @@ fn main() -> Result<(), std::io::Error> {
                 } else {
                     match key_event.code {
                         KeyCode::Char(c) => core.insert_char(c),
-                        KeyCode::Backspace => core.delete_char,
+                        KeyCode::Backspace => core.delete_char(),
                         KeyCode::Enter => core.insert_newline(),
                         KeyCode::Left => core.move_cursor(-1, 0),
                         KeyCode::Right => core.move_cursor(1, 0),
@@ -88,6 +85,6 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     terminal::disable_raw_mode()?;
-    println!("\x1B[2J\x1B[H"); // Очистка экрана при выходе
+    println!("\x1B[2J\x1B[H");
     Ok(())
 }
