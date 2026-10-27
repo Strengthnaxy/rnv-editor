@@ -1,51 +1,49 @@
-# RNV (Ruby Nano Vim)
+# RNV (Ruby and Rust Nano Variant)
 
-**RNV** is a modular terminal text editor written from scratch in pure Ruby. It seamlessly merges the invisible execution speed and modality of **Vim** with the core hidden control keys of **Nano**.
+RNV is a hybrid development repository hosting standalone implementations of a minimalist terminal text editor styled exactly like GNU Nano. It includes an instant single-file monolithic engine built on Ruby and a high-performance compiled core engine built on Rust.
 
-### Decryption
-- **R** — **Ruby** (Development Language Engine)
-- **N** — **Nano** (Core hidden `Ctrl` combinations and behavior)
-- **V** — **Vim** (Modality complexity, navigation via `h,j,k,l` and `ESC`)
-
----
+The repository also includes utility addons for text statistics and background directory maintenance.
 
 ## Project Structure
 
-```text
 rnv-editor/
-├── rnv          # Main executable script (Application entry point)
-├── core.rb      # Text buffer logic, file I/O operations and states
-├── ui.rb        # ANSI render loop and keyboard capture engine
-└── README.md    # Documentation and deployment guide
-```
+├── rnv            # Monolithic Ruby implementation (No external dependencies)
+├── analyzer.rb    # Ruby text statistic and metrics analyzer script
+├── cleaner.exs    # Elixir background backup and log cleaner tool
+├── Cargo.toml     # Rust build manifest
+└── src/           # High-performance Compiled Rust codebase
+    ├── main.rs    # Event capture loops and CLI arguments
+    ├── core.rs    # Memory grid buffer modifiers
+    └── ui.rs      # Optimized double-buffered pink screen flushers
 
----
+## Unified Controls
 
-## Control Scheme
+- Direct Type: Write words immediately into the document canvas.
+- Ctrl + O: Triggers the interactive Save Prompt at the bottom row.
+- Ctrl + X: Purge memory and gracefully exit to your shell session.
+- Arrow Keys: Fluid grid navigation across character limits.
 
-### Global Hotkeys (Active in Command Mode)
-- `Ctrl + O` : Save active file.
-- `Ctrl + X` : Flush memory and exit to shell.
+## Execution and Deployment
 
-### Vim-style Modality
-- `i` : Transition into **INSERT Mode** (type text).
-- `ESC` : Drop back into **COMMAND Mode**.
-- `h` / `j` / `k` / `l` : Grid navigation (Left / Down / Up / Right).
-
-##  Installation & Deployment
-
-1. Clone or download files into a single directory and make the entry point executable:
+### Run using the Ruby Engine
 ```bash
 chmod +x rnv
+./rnv document.txt
 ```
 
-2. Run the editor:
+### Run using the Compiled Rust Engine
+Ensure you have the stable toolchain installed (sudo pacman -S rust):
 ```bash
-./rnv your_file.txt
+cargo build --release
+./target/release/rnv document.txt
 ```
 
-3. Flags:
+### Run Addons
+- Text Analyzer (Ruby):
 ```bash
-./rnv --help       # Show application usage help
-./rnv --version    # Check production build release
+ruby analyzer.rb document.txt
+```
+- System Cleaner (Elixir):
+```bash
+elixir cleaner.exs
 ```
